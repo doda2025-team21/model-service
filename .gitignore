@@ -1,0 +1,5 @@
+## for mac-os users
+*.DS_Store
+
+## frontend-specific files
+target/
