@@ -1,0 +1,17 @@
+name: Train and Release Model
+on:
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Train model
+        run: python3 train_model.py > model_path.txt
+      - id: getpath
+        run: echo "MODEL_PATH=$(cat model_path.txt)" >> $GITHUB_ENV
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: model-release-${{ github.run_number }}
+          files: ${{ env.MODEL_PATH }}
