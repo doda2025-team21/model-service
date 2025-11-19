@@ -17,10 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # copy rest of the directory into your container and make output folder
 COPY . .
-RUN mkdir -p output
 
 # expose the port
 EXPOSE 8081
 
 # run python command to start the microservice
-CMD ["python", "src/serve_model.py"]
+ENTRYPOINT [ "bash", "train_model.sh" ]
