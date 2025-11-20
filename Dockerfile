@@ -23,7 +23,7 @@ WORKDIR /app
 # copy rest of the directory into your container and make output folder
 COPY . .
 
-ENV PORT=8081
+ENV MODEL_PORT=8081
 
 # expose the port
 EXPOSE 8081
