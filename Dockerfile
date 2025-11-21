@@ -20,13 +20,18 @@ COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app
 
-# copy rest of the directory into your container and make output folder
-COPY . .
+# copy src directory (not entire directory to avoid copying large files)
+COPY src/ ./src/
 
-ENV MODEL_PORT=8081
+# create output folder for models
+RUN mkdir -p /app/output
+
+ENV OUTPUT_DIR=/app/output \
+    MODEL_PATH=/app/output/model.joblib \
+    MODEL_PORT=8081
 
 # expose the port
 EXPOSE 8081
 
-# run python command to start the microservice
-ENTRYPOINT [ "bash", "train_model.sh" ]
+# run the Flask app
+CMD ["python", "src/serve_model.py"]
