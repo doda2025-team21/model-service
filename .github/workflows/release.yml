@@ -53,6 +53,11 @@ jobs:
         echo "VERSION_MINOR=$minor" >> $GITHUB_ENV
         echo "VERSION_PATCH=$patch" >> $GITHUB_ENV
 
+    - name: List files to debug
+      run: |
+        echo "Current directory: $(pwd)"
+        ls -la
+        
     - name: Update .env to release version
       run: |
         sed -i "s/^model_service_version=.*/model_service_version=${VERSION}/" .env
