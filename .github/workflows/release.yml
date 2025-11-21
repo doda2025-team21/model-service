@@ -89,7 +89,7 @@ jobs:
 
         git add .env
 
-        git commit -m "Set backend version to ${VERSION}, bumped to ${NEXT_VERSION}" || echo "No changes to commit"
+        git commit -m "The current version: ${VERSION}" || echo "No changes to commit"
 
         if git diff --quiet origin/main...HEAD; then
           echo "Nothing to push"
