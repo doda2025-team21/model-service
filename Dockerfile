@@ -28,10 +28,11 @@ RUN mkdir -p /app/output
 
 ENV OUTPUT_DIR=/app/output \
     MODEL_PATH=/app/output/model.joblib \
-    MODEL_PORT=8081
+    MODEL_PORT=8081 \
+    METRICS_PORT=9091
 
-# expose the port
-EXPOSE 8081
+# expose the ports (app + metrics)
+EXPOSE 8081 9091
 
 # run the Flask app
 CMD ["python", "src/serve_model.py"]

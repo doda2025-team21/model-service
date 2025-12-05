@@ -9,11 +9,36 @@ import pandas as pd
 import os 
 import requests
 import logging
+import time
+from threading import Thread
 
+from prometheus_client import Counter, Gauge, Histogram, start_http_server, REGISTRY
 from text_preprocessing import prepare, _extract_message_len, _text_process
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+METRICS_PORT = int(os.getenv('METRICS_PORT', 9091))
+
+model_predictions_total = Counter(
+    'model_predictions_total',
+    'Total predictions made by ML model',
+    ['model_name', 'prediction', 'confidence_bucket']
+)
+
+model_loaded = Gauge(
+    'model_loaded',
+    'Whether model is loaded and ready (1=yes, 0=no)',
+    ['model_name', 'version']
+)
+
+model_inference_duration = Histogram(
+    'model_inference_duration_seconds',
+    'Model inference time',
+    ['model_name'],
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+)
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -93,6 +118,9 @@ model = load_model()
 
 if model is None:
     logger.warning("Starting service without a model. Predictions will fail.")
+    model_loaded.labels(model_name='spam_classifier', version='v1').set(0)
+else:
+    model_loaded.labels(model_name='spam_classifier', version='v1').set(1)
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -107,8 +135,20 @@ def predict():
         if not sms:
             return jsonify({"error": "No SMS provided"}), 400
         
+        # Time the inference
+        start_time = time.time()
         processed_sms = prepare(sms)
         prediction = model.predict(processed_sms)[0]
+        duration = time.time() - start_time
+        
+        # Record metrics
+        model_inference_duration.labels(model_name='spam_classifier').observe(duration)
+        confidence = 'high'  # simplified - real impl would use predict_proba
+        model_predictions_total.labels(
+            model_name='spam_classifier',
+            prediction=prediction,
+            confidence_bucket=confidence
+        ).inc()
         
         res = {
             "result": prediction,
@@ -130,4 +170,8 @@ def health():
     })
 
 if __name__ == '__main__':
+    # Start Prometheus metrics server on separate port
+    logger.info(f"Starting metrics server on port {METRICS_PORT}")
+    start_http_server(METRICS_PORT)
+    
     app.run(host="0.0.0.0", port=PORT, debug=False)
