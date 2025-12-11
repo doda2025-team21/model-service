@@ -72,11 +72,12 @@ def download_model_from_release():
         logger.error(f"Failed to fetch release: {e}")
         return False
     
-    # Download all .joblib files from the release
+    # Download model files from the release (.joblib or .bin)
     for asset in release_data.get("assets", []):
-        if asset["name"].endswith(".joblib"):
+        if asset["name"].endswith(".joblib") or asset["name"].endswith(".bin"):
             download_url = asset["browser_download_url"]
-            local_path = os.path.join(OUTPUT_DIR, asset["name"])
+            # Always save as model.joblib so load_model can find it
+            local_path = MODEL_PATH
             
             logger.info(f"Downloading {asset['name']}...")
             try:
