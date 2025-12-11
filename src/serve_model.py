@@ -1,6 +1,7 @@
 """
 Flask API of the SMS Spam detection model.
 Downloads model from GitHub release on startup if not present locally.
+Exposes Prometheus metrics on a separate port.
 """
 import joblib
 from flask import Flask, jsonify, request
@@ -9,20 +10,31 @@ import pandas as pd
 import os 
 import requests
 import logging
+import threading
+import time
 
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, start_http_server
 from text_preprocessing import prepare, _extract_message_len, _text_process
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)                                                                                                                                                                                                                                                                                                            
 
 app = Flask(__name__)
-swagger = Swagger(app)
+swagger = Swagger(app)                          
 
+# Prometheus metrics
+PREDICTIONS_TOTAL = Counter('model_predictions_total', 'Total number of predictions', ['result'])
+PREDICTION_LATENCY = Histogram('model_prediction_latency_seconds', 'Prediction latency in seconds',
+                                buckets=[0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0])
+MODEL_LOADED = Gauge('model_loaded', 'Whether the model is loaded (1) or not (0)')
+PREDICTION_ERRORS = Counter('model_prediction_errors_total', 'Total number of prediction errors')
+                                                                                                                                                                
 # Configuration
-DEFAULT_MODEL_URL = "https://api.github.com/repos/doda25-team21/model-service/releases/latest"
+DEFAULT_MODEL_URL = "https://api.github.com/repos/doda2025-team21/model-service/releases/latest"                                                                  
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/app/output")
 MODEL_PATH = os.path.join(OUTPUT_DIR, "model.joblib")
 PORT = int(os.getenv('MODEL_PORT', 8081))
+METRICS_PORT = int(os.getenv('METRICS_PORT', 9091))
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -93,22 +105,42 @@ model = load_model()
 
 if model is None:
     logger.warning("Starting service without a model. Predictions will fail.")
+    MODEL_LOADED.set(0)
+else:
+    MODEL_LOADED.set(1)
+
+# Start Prometheus metrics server on separate port
+def start_metrics_server():
+    """Start the Prometheus metrics HTTP server."""
+    logger.info(f"Starting metrics server on port {METRICS_PORT}")
+    start_http_server(METRICS_PORT)
+
+metrics_thread = threading.Thread(target=start_metrics_server, daemon=True)
+metrics_thread.start()
 
 @app.route('/predict', methods=['POST'])
 def predict():
     
     if model is None:
+        PREDICTION_ERRORS.inc()
         return jsonify({"error": "Model not available"}), 503
     
+    start_time = time.time()
     try:
         input_data = request.get_json()
         sms = input_data.get('sms')
         
         if not sms:
+            PREDICTION_ERRORS.inc()
             return jsonify({"error": "No SMS provided"}), 400
         
         processed_sms = prepare(sms)
         prediction = model.predict(processed_sms)[0]
+        
+        # Record metrics
+        latency = time.time() - start_time
+        PREDICTION_LATENCY.observe(latency)
+        PREDICTIONS_TOTAL.labels(result=prediction).inc()
         
         res = {
             "result": prediction,
@@ -118,6 +150,7 @@ def predict():
         print(res)
         return jsonify(res)
     except Exception as e:
+        PREDICTION_ERRORS.inc()
         logger.error(f"Prediction error: {e}")
         return jsonify({"error": str(e)}), 500
 
