@@ -44,7 +44,7 @@ app = Flask(__name__)
 swagger = Swagger(app)
 
 # Configuration
-DEFAULT_MODEL_URL = "https://api.github.com/repos/doda25-team21/model-service/releases/latest"
+DEFAULT_MODEL_URL = "https://api.github.com/repos/doda2025-team21/model-service/releases/latest"
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/app/output")
 MODEL_PATH = os.path.join(OUTPUT_DIR, "model.joblib")
 PORT = int(os.getenv('MODEL_PORT', 8081))
