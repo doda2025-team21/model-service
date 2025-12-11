@@ -24,9 +24,10 @@ WORKDIR /app
 COPY . .
 
 ENV MODEL_PORT=8081
+ENV METRICS_PORT=9091
 
-# expose the port
-EXPOSE 8081
+# expose the ports (API and Prometheus metrics)
+EXPOSE 8081 9091
 
 # run python command to start the microservice
 ENTRYPOINT [ "bash", "train_model.sh" ]
