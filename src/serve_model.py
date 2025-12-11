@@ -1,6 +1,6 @@
 """
 Flask API of the SMS Spam detection model.
-Downloads model from GitHub release on startup if not present locally.
+Downloads model from GitHub release on startup, or trains locally if unavailable.
 Exposes Prometheus metrics on a separate port.
 """
 import joblib
@@ -14,7 +14,8 @@ import threading
 import time
 
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, start_http_server
-from text_preprocessing import prepare, _extract_message_len, _text_process
+from text_preprocessing import prepare, _extract_message_len, _text_process, _load_data, _preprocess
+from sklearn.tree import DecisionTreeClassifier
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)                                                                                                                                                                                                                                                                                                            
@@ -85,12 +86,42 @@ def download_model_from_release():
     logger.error("Model file not found after download.")
     return False
 
+def train_model_locally():
+    """Train a Decision Tree model locally using the SMS spam dataset."""
+    logger.info("Training model locally...")
+    try:
+        # Load and preprocess data
+        messages = _load_data()
+        logger.info(f"Loaded {len(messages)} messages for training")
+        
+        preprocessed_data = _preprocess(messages)
+        
+        # Train Decision Tree classifier
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            preprocessed_data, messages['label'], test_size=0.3, random_state=101
+        )
+        
+        classifier = DecisionTreeClassifier()
+        classifier.fit(X_train, y_train)
+        
+        # Save the model
+        joblib.dump(classifier, MODEL_PATH)
+        logger.info(f"Model trained and saved to {MODEL_PATH}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to train model locally: {e}")
+        return False
+
 def load_model():
-    """Load model from disk. Downloads if not present."""
+    """Load model from disk. Downloads if not present, trains if download fails."""
     global model
     
     # Try to download if missing
-    download_model_from_release()
+    if not os.path.exists(MODEL_PATH):
+        if not download_model_from_release():
+            logger.info("Download failed, attempting to train locally...")
+            train_model_locally()
     
     # Try to load the model
     try:
@@ -99,6 +130,15 @@ def load_model():
         return model
     except Exception as e:
         logger.error(f"Failed to load model from {MODEL_PATH}: {e}")
+        # Last resort: train locally
+        logger.info("Attempting to train model locally as last resort...")
+        if train_model_locally():
+            try:
+                model = joblib.load(MODEL_PATH)
+                logger.info("Model loaded successfully after local training.")
+                return model
+            except Exception as e2:
+                logger.error(f"Still failed to load model: {e2}")
         return None
 
 # Load model on startup

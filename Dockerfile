@@ -23,6 +23,9 @@ WORKDIR /app
 # copy src directory (not entire directory to avoid copying large files)
 COPY src/ ./src/
 
+# copy training data for local model training
+COPY smsspamcollection/ ./smsspamcollection/
+
 # create output folder for models
 RUN mkdir -p /app/output
 
