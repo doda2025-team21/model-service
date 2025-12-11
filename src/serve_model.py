@@ -59,19 +59,21 @@ def download_model_from_release():
         logger.error(f"Failed to fetch release: {e}")
         return False
     
-    # Download all .joblib files from the release
+    # Download model files from the release (.joblib or .bin)
     for asset in release_data.get("assets", []):
-        if asset["name"].endswith(".joblib"):
+        if asset["name"].endswith(".joblib") or asset["name"].endswith(".bin"):
             download_url = asset["browser_download_url"]
-            local_path = os.path.join(OUTPUT_DIR, asset["name"])
+            # Save as model.joblib regardless of original name
+            local_path = MODEL_PATH
             
-            logger.info(f"Downloading {asset['name']}...")
+            logger.info(f"Downloading {asset['name']} to {local_path}...")
             try:
-                r = requests.get(download_url, timeout=30)
+                r = requests.get(download_url, timeout=60)
                 r.raise_for_status()
                 with open(local_path, "wb") as f:
                     f.write(r.content)
-                logger.info(f"Successfully downloaded {asset['name']}")
+                logger.info(f"Successfully downloaded {asset['name']} as model.joblib")
+                break  # Only need one model file
             except requests.RequestException as e:
                 logger.error(f"Failed to download {asset['name']}: {e}")
                 return False
