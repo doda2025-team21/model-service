@@ -20,6 +20,10 @@ COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app
 
+# Download NLTK data required for text processing
+RUN python -c "import nltk; nltk.download('stopwords', download_dir='/usr/local/nltk_data'); nltk.download('punkt', download_dir='/usr/local/nltk_data')"
+ENV NLTK_DATA=/usr/local/nltk_data
+
 # copy rest of the directory into your container and make output folder
 COPY . .
 
